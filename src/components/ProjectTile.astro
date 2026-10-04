@@ -1,0 +1,135 @@
+---
+import Glyph from './Glyph.astro';
+import type { Project } from '../data/projects';
+
+interface Props {
+	project: Project;
+	featured?: boolean;
+}
+
+const { project, featured = false } = Astro.props;
+---
+
+<a class:list={['tile', { featured }]} href={project.href}>
+	<div class="meta">
+		<span>{project.id}</span>
+		<span>{project.year}</span>
+	</div>
+	<div class="art">
+		<Glyph type={project.glyph} seed={project.id} />
+	</div>
+	<div class="caption">
+		<h2>{project.name}</h2>
+		<span>{project.field}</span>
+	</div>
+</a>
+
+<style>
+	.tile {
+		--tick: rgba(var(--accent), 0.45);
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		aspect-ratio: 1;
+		padding: 1rem 1.1rem;
+		overflow: hidden;
+		color: var(--fg-dim);
+		text-decoration: none;
+		background-color: var(--tile-bg);
+		/* corner registration marks */
+		background-image:
+			linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
+			linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
+			linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
+			linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick));
+		background-repeat: no-repeat;
+		background-size: 10px 1px, 1px 10px;
+		background-position:
+			top left, top left, top right, top right,
+			bottom left, bottom left, bottom right, bottom right;
+		outline: 1px solid var(--line);
+		outline-offset: -1px;
+		transition: outline-color 0.4s, color 0.4s;
+	}
+	.tile::after {
+		content: '';
+		position: absolute;
+		inset: 0 0 auto;
+		height: 40%;
+		background: linear-gradient(to bottom, transparent, rgba(var(--accent), 0.07) 85%, rgba(var(--accent), 0.5) 100%, transparent 100%);
+		transform: translateY(-100%);
+		pointer-events: none;
+		opacity: 0;
+	}
+	.tile:is(:hover, :focus-visible) {
+		outline-color: rgba(var(--accent), 0.35);
+		color: var(--fg);
+	}
+	.tile:is(:hover, :focus-visible)::after {
+		opacity: 1;
+		animation: scan 1.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+	}
+	@keyframes scan {
+		to { transform: translateY(250%); }
+	}
+
+	.meta,
+	.caption span {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+	}
+	.meta {
+		display: flex;
+		justify-content: space-between;
+		opacity: 0.6;
+	}
+
+	.art {
+		flex: 1;
+		min-height: 0;
+		display: grid;
+		place-items: center;
+		padding: 8% 12%;
+		color: rgb(var(--accent));
+		opacity: 0.7;
+		transition: opacity 0.5s, filter 0.5s, transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+	}
+	.art :global(svg) {
+		max-height: 100%;
+		aspect-ratio: 1;
+	}
+	.tile:is(:hover, :focus-visible) .art {
+		opacity: 1;
+		transform: scale(1.04);
+		filter: drop-shadow(0 0 6px rgba(var(--accent), 0.55));
+	}
+
+	.caption {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: 1rem;
+	}
+	h2 {
+		margin: 0;
+		font-size: 1rem;
+		font-weight: 500;
+		letter-spacing: 0.01em;
+		color: var(--fg);
+	}
+	.caption span {
+		opacity: 0.6;
+		text-align: right;
+	}
+
+	.featured h2 {
+		font-size: 1.5rem;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.tile:is(:hover, :focus-visible)::after { animation: none; opacity: 0; }
+		.tile:is(:hover, :focus-visible) .art { transform: none; }
+	}
+</style>

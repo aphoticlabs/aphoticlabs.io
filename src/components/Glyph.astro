@@ -1,0 +1,228 @@
+---
+import type { GlyphType } from '../data/projects';
+
+interface Props {
+	type: GlyphType;
+	seed: string;
+}
+
+const { type, seed } = Astro.props;
+
+// Deterministic RNG so each project's glyph is stable across builds.
+function hash(s: string) {
+	let h = 1779033703 ^ s.length;
+	for (let i = 0; i < s.length; i++) {
+		h = Math.imul(h ^ s.charCodeAt(i), 3432918353);
+		h = (h << 13) | (h >>> 19);
+	}
+	return h >>> 0;
+}
+function mulberry32(a: number) {
+	return () => {
+		a = (a + 0x6d2b79f5) | 0;
+		let t = Math.imul(a ^ (a >>> 15), 1 | a);
+		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+	};
+}
+const rand = mulberry32(hash(seed));
+const between = (a: number, b: number) => a + rand() * (b - a);
+const gauss = () => Math.sqrt(-2 * Math.log(1 - rand())) * Math.cos(2 * Math.PI * rand());
+const n = (v: number) => v.toFixed(1);
+const TAU = Math.PI * 2;
+
+type Line = { d: string; o?: number; w?: number; fill?: boolean };
+type Dot = { x: number; y: number; r: number; o?: number };
+const lines: Line[] = [];
+const dots: Dot[] = [];
+let groupClass = '';
+
+switch (type) {
+	case 'ridgelines': {
+		const phases = Array.from({ length: 3 }, () => between(0, TAU));
+		for (let i = 0; i < 18; i++) {
+			const y0 = 50 + i * 7;
+			let d = `M20 ${y0}`;
+			for (let x = 20; x <= 180; x += 3) {
+				const env = Math.exp(-((x - 100) ** 2) / 900);
+				const wobble =
+					Math.sin(x * 0.11 + phases[0] + i) * 0.5 +
+					Math.sin(x * 0.23 + phases[1] - i * 0.7) * 0.3 +
+					Math.sin(x * 0.05 + phases[2]) * 0.2;
+				d += ` L${x} ${n(y0 - env * (14 + Math.abs(wobble) * 22))}`;
+			}
+			lines.push({ d: d + ` L180 ${y0}`, fill: true, o: 0.35 + (i / 18) * 0.65 });
+		}
+		break;
+	}
+	case 'orbits': {
+		groupClass = 'spin';
+		for (let i = 0; i < 6; i++) {
+			const rx = 22 + i * 12;
+			const ry = rx * between(0.28, 0.42);
+			const rot = between(0, 180);
+			const rad = (rot * Math.PI) / 180;
+			const t = between(0, TAU);
+			const px = rx * Math.cos(t), py = ry * Math.sin(t);
+			lines.push({
+				d: `M${n(100 - rx * Math.cos(rad))} ${n(100 - rx * Math.sin(rad))} A${rx} ${n(ry)} ${n(rot)} 1 1 ${n(100 + rx * Math.cos(rad))} ${n(100 + rx * Math.sin(rad))} A${rx} ${n(ry)} ${n(rot)} 1 1 ${n(100 - rx * Math.cos(rad))} ${n(100 - rx * Math.sin(rad))}`,
+				o: 0.3 + i * 0.08,
+			});
+			dots.push({
+				x: 100 + px * Math.cos(rad) - py * Math.sin(rad),
+				y: 100 + px * Math.sin(rad) + py * Math.cos(rad),
+				r: 2.4,
+			});
+		}
+		dots.push({ x: 100, y: 100, r: 5 });
+		break;
+	}
+	case 'contour': {
+		const p = Array.from({ length: 3 }, () => between(0, TAU));
+		for (let i = 0; i < 13; i++) {
+			const base = 8 + i * 6.4;
+			const amp = 0.04 + i * 0.012;
+			let d = '';
+			for (let k = 0; k <= 90; k++) {
+				const th = (k / 90) * TAU;
+				const r =
+					base * (1 + amp * Math.sin(2 * th + p[0]) + amp * 0.8 * Math.sin(3 * th + p[1]) + amp * 0.5 * Math.sin(5 * th + p[2]));
+				d += `${k ? 'L' : 'M'}${n(100 + r * Math.cos(th))} ${n(100 + r * Math.sin(th))}`;
+			}
+			lines.push({ d: d + 'Z', o: i % 4 === 0 ? 0.95 : 0.4 });
+		}
+		break;
+	}
+	case 'lattice': {
+		const s = 15;
+		const nodes: { x: number; y: number; lit: boolean }[] = [];
+		for (let row = -6; row <= 6; row++) {
+			for (let col = -6; col <= 6; col++) {
+				const x = 100 + col * s + (row % 2 ? s / 2 : 0);
+				const y = 100 + row * s * 0.866;
+				if ((x - 100) ** 2 + (y - 100) ** 2 > 78 ** 2) continue;
+				nodes.push({ x, y, lit: rand() < 0.32 });
+			}
+		}
+		for (const a of nodes) {
+			for (const b of nodes) {
+				if (a === b || !a.lit || !b.lit || a.x > b.x || (a.x === b.x && a.y > b.y)) continue;
+				if (Math.hypot(a.x - b.x, a.y - b.y) < s * 1.05) {
+					lines.push({ d: `M${n(a.x)} ${n(a.y)} L${n(b.x)} ${n(b.y)}`, o: 0.8 });
+				}
+			}
+			dots.push({ x: a.x, y: a.y, r: a.lit ? 2.6 : 1, o: a.lit ? 1 : 0.35 });
+		}
+		break;
+	}
+	case 'spectrum': {
+		const p = Array.from({ length: 3 }, () => between(0, TAU));
+		for (let i = 0; i < 120; i++) {
+			const th = (i / 120) * TAU;
+			const v = Math.abs(Math.sin(th * 3 + p[0]) * 0.5 + Math.sin(th * 7 + p[1]) * 0.3 + Math.sin(th * 13 + p[2]) * 0.2);
+			const r0 = 26, r1 = r0 + 8 + v * 50 + rand() * 6;
+			lines.push({
+				d: `M${n(100 + r0 * Math.cos(th))} ${n(100 + r0 * Math.sin(th))} L${n(100 + r1 * Math.cos(th))} ${n(100 + r1 * Math.sin(th))}`,
+				o: 0.3 + v * 0.7,
+			});
+		}
+		lines.push({ d: `M118 100 A18 18 0 1 1 82 100 A18 18 0 1 1 118 100`, o: 0.6 });
+		break;
+	}
+	case 'helix': {
+		groupClass = 'tilt';
+		const ph = between(0, TAU);
+		let a = '', b = '';
+		for (let x = 10; x <= 190; x += 2) {
+			const t = x * 0.065 + ph;
+			a += `${x === 10 ? 'M' : 'L'}${x} ${n(100 + 32 * Math.sin(t))}`;
+			b += `${x === 10 ? 'M' : 'L'}${x} ${n(100 + 32 * Math.sin(t + Math.PI))}`;
+		}
+		for (let x = 14; x <= 186; x += 7) {
+			const t = x * 0.065 + ph;
+			const depth = (Math.cos(t) + 1) / 2;
+			lines.push({ d: `M${x} ${n(100 + 32 * Math.sin(t))} L${x} ${n(100 - 32 * Math.sin(t))}`, o: 0.15 + depth * 0.5 });
+		}
+		lines.push({ d: a, w: 1.6 }, { d: b, w: 1.6, o: 0.6 });
+		break;
+	}
+	case 'scatter': {
+		const centers = Array.from({ length: 3 }, () => ({ x: between(60, 140), y: between(60, 140), s: between(8, 20) }));
+		for (let i = 0; i < 320; i++) {
+			const c = centers[i % 3];
+			const x = c.x + gauss() * c.s, y = c.y + gauss() * c.s;
+			if (x < 15 || x > 185 || y < 15 || y > 185) continue;
+			dots.push({ x, y, r: rand() < 0.06 ? 2.2 : 0.9, o: between(0.3, 1) });
+		}
+		lines.push({ d: 'M15 185 L185 185 M15 185 L15 15', o: 0.3 });
+		break;
+	}
+	case 'heatmap': {
+		const peaks = Array.from({ length: 3 }, () => ({ x: between(2, 10), y: between(2, 10), s: between(2, 4) }));
+		for (let i = 0; i < 12; i++) {
+			for (let j = 0; j < 12; j++) {
+				const v = Math.min(1, peaks.reduce((acc, p) => acc + Math.exp(-((i - p.x) ** 2 + (j - p.y) ** 2) / (2 * p.s ** 2)), 0));
+				const x = 28 + i * 12.4, y = 28 + j * 12.4;
+				lines.push({ d: `M${n(x)} ${n(y)}h10v10h-10Z`, fill: true, o: 0.06 + v * 0.94 });
+			}
+		}
+		break;
+	}
+	case 'lissajous': {
+		const pairs = [[3, 2], [5, 4], [3, 4], [5, 6], [7, 6]];
+		const [fa, fb] = pairs[Math.floor(rand() * pairs.length)];
+		const delta = between(0, Math.PI);
+		let d = '';
+		for (let k = 0; k <= 720; k++) {
+			const t = (k / 720) * TAU;
+			d += `${k ? 'L' : 'M'}${n(100 + 72 * Math.sin(fa * t + delta))} ${n(100 + 72 * Math.sin(fb * t))}`;
+		}
+		lines.push({ d, o: 0.9 });
+		lines.push({ d: 'M100 20 V180 M20 100 H180', o: 0.15 });
+		break;
+	}
+}
+---
+
+<svg class="glyph" viewBox="0 0 200 200" aria-hidden="true" data-type={type}>
+	<g class={groupClass}>
+		{lines.map((l) =>
+			l.fill && type === 'heatmap' ? (
+				<path d={l.d} fill="currentColor" opacity={l.o ?? 1} />
+			) : (
+				<path
+					d={l.d}
+					style={l.fill ? 'fill: var(--tile-bg)' : 'fill: none'}
+					stroke="currentColor"
+					stroke-width={l.w ?? 1}
+					stroke-linejoin="round"
+					stroke-linecap="round"
+					opacity={l.o ?? 1}
+				/>
+			)
+		)}
+		{dots.map((d) => <circle cx={n(d.x)} cy={n(d.y)} r={d.r} fill="currentColor" opacity={d.o ?? 1} />)}
+	</g>
+</svg>
+
+<style>
+	.glyph {
+		width: 100%;
+		height: 100%;
+		overflow: visible;
+	}
+	.spin {
+		transform-origin: 100px 100px;
+		animation: spin 120s linear infinite;
+	}
+	.tilt {
+		transform-origin: 100px 100px;
+		transform: rotate(-28deg);
+	}
+	@keyframes spin {
+		to { transform: rotate(360deg); }
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.spin { animation: none; }
+	}
+</style>

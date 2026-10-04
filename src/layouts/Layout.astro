@@ -1,18 +1,26 @@
 ---
 interface Props {
 	title: string;
+	description?: string;
 }
 
-const { title } = Astro.props;
+const { title, description = 'Aphotic Labs' } = Astro.props;
 ---
 
 <!doctype html>
 <html lang="en">
 	<head>
 		<meta charset="UTF-8" />
-		<meta name="description" content="Astro description" />
-		<meta name="viewport" content="width=device-width" />
+		<meta name="description" content={description} />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="theme-color" content="#04070b" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500&display=swap"
+			rel="stylesheet"
+		/>
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
 	</head>
@@ -20,31 +28,42 @@ const { title } = Astro.props;
 		<slot />
 	</body>
 </html>
+
 <style is:global>
 	:root {
-		--accent: 58, 96, 234;
-		--accent-light: 204, 236, 250;
-		--accent-dark: 49, 10, 101;
-		--accent-gradient: linear-gradient(
-			45deg,
-			rgb(var(--accent)),
-			rgb(var(--accent-light)) 30%,
-			white 60%
-		);
+		--accent: 94, 242, 214;
+		--bg: #04070b;
+		--tile-bg: #060b11;
+		--fg: #d7e3ea;
+		--fg-dim: #6b7d8c;
+		--line: rgba(140, 180, 200, 0.09);
+		--font-sans: 'Space Grotesk', system-ui, sans-serif;
+		--font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+		color-scheme: dark;
+	}
+	*,
+	*::before,
+	*::after {
+		box-sizing: border-box;
 	}
 	html {
-		font-family: system-ui, sans-serif;
-		background: #13151a;
+		background: var(--bg);
 	}
-	code {
-		font-family:
-			Menlo,
-			Monaco,
-			Lucida Console,
-			Liberation Mono,
-			DejaVu Sans Mono,
-			Bitstream Vera Sans Mono,
-			Courier New,
-			monospace;
+	body {
+		margin: 0;
+		min-height: 100vh;
+		overflow-x: clip;
+		color: var(--fg);
+		font-family: var(--font-sans);
+		-webkit-font-smoothing: antialiased;
+		/* light fades out the deeper you scroll */
+		background: linear-gradient(to bottom, #0a1a26 0%, #06111a 18%, var(--bg) 55%, #020305 100%);
+	}
+	::selection {
+		background: rgba(var(--accent), 0.3);
+	}
+	a:focus-visible {
+		outline: 1px solid rgb(var(--accent));
+		outline-offset: 2px;
 	}
 </style>
